@@ -210,32 +210,94 @@ class FiberDistanceLogic:
   def __init__(self):
     pass
 
-  def hasImageData(self,volumeNode):
-    """This is a dummy logic method that 
-    returns true if the passed in volume
-    node has valid image data
+  def loadAndCalculate(self,tractFile1,tractFile2):
     """
-    if not volumeNode:
-      print('no volume node')
-      return False
-    if volumeNode.GetImageData() == None:
-      print('no image data')
-      return False
-    return True
+    Load two .vtk tract files, and then calculate the distance between them
+    """
+    tract1 = slicer.util.loadFiberBundle(tractFile1,returnNode=True)[1]
+    tract2 = slicer.util.loadFiberBundle(tractFile2,returnNode=True)[1]
+    return(self.hausdorffDistance(tract1,tract2))
+
+  def pointDistance(self,pta,ptb):
+      import math
+      return math.sqrt(sum([(b-a)**2 for a,b in zip(pta,ptb)] ))
 
   def hausdorffDistance(self,fiber1,fiber2):
     """
-    Run the actual algorithm
+    calculate the distance between two fiber bundles
+    Based on code from Laurent Chauvin
     """
-    return True
+    polyA = fiber1.GetPolyData()
+    polyB = fiber2.GetPolyData()
 
+    locA = vtk.vtkMergePoints()
+    locB = vtk.vtkMergePoints()
+
+    locA.SetDataSet(polyA)
+    locB.SetDataSet(polyB)
+
+    locs = (locA,locB)
+    for loc in locs:
+        loc.AutomaticOn()
+        loc.BuildLocator()
+
+    ptsA = polyA.GetPoints()
+    ptsB = polyB.GetPoints()
+
+    rangeA = ptsA.GetNumberOfPoints()
+    rangeB = ptsB.GetNumberOfPoints()
+
+    maxd = 0.0
+    maxd1 = 0.0
+    avgd = 0.0
+    avgd1 = 0.0
+
+    distanceA = vtk.vtkFloatArray()
+    distanceA.SetName("Distance")   
+    for i in range(rangeA):
+        pt = ptsA.GetPoint(i)
+        bid = locB.FindClosestPoint(pt)
+        ptb = ptsB.GetPoint(bid)
+        d = self.pointDistance(pt,ptb)
+        distanceA.InsertNextValue(d)
+        avgd += d
+        if d > maxd:
+            maxd = d    
+    avgd = avgd / rangeA
+#    print avgd
+    print maxd
+
+    distanceB = vtk.vtkFloatArray()
+    distanceB.SetName("Distance")   
+    for i in range(rangeB):
+        pt = ptsB.GetPoint(i)
+        bid = locA.FindClosestPoint(pt)
+        ptb = ptsA.GetPoint(bid)
+        d = self.pointDistance(pt,ptb)
+        distanceB.InsertNextValue(d)
+        avgd1 += d
+        if d > maxd1:
+            maxd1 = d
+    avgd1 = avgd1 / rangeB
+#    print avgd1
+    print maxd1
+    if avgd1 > avgd:
+        print avgd1
+    else:
+        print avgd
+
+    polyA.GetPointData().SetScalars(distanceA)
+    polyB.GetPointData().SetScalars(distanceB)
+
+    print ('Max distance is %g', maxd)
+    return maxd
 
 class FiberDistanceTest(unittest.TestCase):
   """
   This is the test case for your scripted module.
   """
 
-  def delayDisplay(self,message,msec=1000):
+  def delayDisplay(self,message,msec=200):
     """This utility method displays a small dialog and waits.
     This does two things: 1) it lets the event loop catch up
     to the state of the test so that rendering and widget updates
@@ -304,5 +366,15 @@ class FiberDistanceTest(unittest.TestCase):
     tract2 = slicer.util.getNode('tract2')
 
     logic = FiberDistanceLogic()
-    self.assertTrue( logic.hausdorffDistance(tract1, tract2) )
+
+    dist = logic.hausdorffDistance(tract1, tract2)
+  
+    file1 = tract1.GetStorageNode().GetFileName()
+    file2 = tract2.GetStorageNode().GetFileName()
+    fileDistance = logic.loadAndCalculate(file1, file2)
+
+    self.assertTrue(dist == fileDistance)
+    
+
+
     self.delayDisplay('Test passed!')
