@@ -9,14 +9,15 @@ from __main__ import vtk, qt, ctk, slicer
 class FiberDistance:
   def __init__(self, parent):
     parent.title = "FiberDistance" # TODO make this more human readable by adding spaces
-    parent.categories = ["Examples"]
+    parent.categories = ["Diffusion.Tractography"]
     parent.dependencies = []
-    parent.contributors = ["Jean-Christophe Fillion-Robin (Kitware), Steve Pieper (Isomics)"] # replace with "Firstname Lastname (Org)"
+    parent.contributors = ["Steve Pieper (Isomics)"] # replace with "Firstname Lastname (Org)"
     parent.helpText = """
-    This is an example of scripted loadable module bundled in an extension.
+    This is a scripted module to calculate distance metrics on fibers
     """
     parent.acknowledgementText = """
-    This file was originally developed by Jean-Christophe Fillion-Robin, Kitware Inc. and Steve Pieper, Isomics, Inc.  and was partially funded by NIH grant 3P41RR013218-12S1.
+    This file was originally developed by Steve Pieper, Isomics, Inc.  and was partially funded by NIH grant 3P41RR013218-12S1.
+    Based on initial work by Laurent Chauvin and Sonia Pujol of BWH.
 """ # replace with organization, grant and thanks.
     self.parent = parent
 
@@ -81,57 +82,47 @@ class FiberDistanceWidget:
     #
     # Parameters Area
     #
+
+    # Collapsible button
     parametersCollapsibleButton = ctk.ctkCollapsibleButton()
-    parametersCollapsibleButton.text = "Parameters"
+    parametersCollapsibleButton.text = "A collapsible button"
     self.layout.addWidget(parametersCollapsibleButton)
 
-    # Layout within the dummy collapsible button
+    # Layout within the parameters collapsible button
     parametersFormLayout = qt.QFormLayout(parametersCollapsibleButton)
 
-    #
-    # input volume selector
-    #
-    self.inputSelector = slicer.qMRMLNodeComboBox()
-    self.inputSelector.nodeTypes = ( ("vtkMRMLScalarVolumeNode"), "" )
-    self.inputSelector.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
-    self.inputSelector.selectNodeUponCreation = True
-    self.inputSelector.addEnabled = False
-    self.inputSelector.removeEnabled = False
-    self.inputSelector.noneEnabled = False
-    self.inputSelector.showHidden = False
-    self.inputSelector.showChildNodeTypes = False
-    self.inputSelector.setMRMLScene( slicer.mrmlScene )
-    self.inputSelector.setToolTip( "Pick the input to the algorithm." )
-    parametersFormLayout.addRow("Input Volume: ", self.inputSelector)
+    # fibers to compare
+    self.fiber1Selector = slicer.qMRMLNodeComboBox(parametersCollapsibleButton)
+    self.fiber1Selector.nodeTypes = ( ("vtkMRMLFiberBundleNode"), "" )
+    self.fiber1Selector.selectNodeUponCreation = False
+    self.fiber1Selector.addEnabled = False
+    self.fiber1Selector.removeEnabled = False
+    self.fiber1Selector.noneEnabled = True
+    self.fiber1Selector.showHidden = False
+    self.fiber1Selector.showChildNodeTypes = False
+    self.fiber1Selector.setMRMLScene( slicer.mrmlScene )
+    self.fiber1Selector.setToolTip( "Pick the first fiber bundle to be compared." )
+    parametersFormLayout.addRow("Fiber Bundle 1", self.fiber1Selector)
 
-    #
-    # output volume selector
-    #
-    self.outputSelector = slicer.qMRMLNodeComboBox()
-    self.outputSelector.nodeTypes = ( ("vtkMRMLScalarVolumeNode"), "" )
-    self.outputSelector.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
-    self.outputSelector.selectNodeUponCreation = False
-    self.outputSelector.addEnabled = True
-    self.outputSelector.removeEnabled = True
-    self.outputSelector.noneEnabled = False
-    self.outputSelector.showHidden = False
-    self.outputSelector.showChildNodeTypes = False
-    self.outputSelector.setMRMLScene( slicer.mrmlScene )
-    self.outputSelector.setToolTip( "Pick the output to the algorithm." )
-    parametersFormLayout.addRow("Output Volume: ", self.outputSelector)
+    # fibers to compare
+    self.fiber2Selector = slicer.qMRMLNodeComboBox(parametersCollapsibleButton)
+    self.fiber2Selector.nodeTypes = ( ("vtkMRMLFiberBundleNode"), "" )
+    self.fiber2Selector.selectNodeUponCreation = False
+    self.fiber2Selector.addEnabled = False
+    self.fiber2Selector.removeEnabled = False
+    self.fiber2Selector.noneEnabled = True
+    self.fiber2Selector.showHidden = False
+    self.fiber2Selector.showChildNodeTypes = False
+    self.fiber2Selector.setMRMLScene( slicer.mrmlScene )
+    self.fiber2Selector.setToolTip( "Pick the second fiber bundle to be compared." )
+    parametersFormLayout.addRow("Fiber Bundle 2 ", self.fiber2Selector)
 
-    #
-    # Apply Button
-    #
-    self.applyButton = qt.QPushButton("Apply")
-    self.applyButton.toolTip = "Run the algorithm."
-    self.applyButton.enabled = False
-    parametersFormLayout.addRow(self.applyButton)
+    # apply
+    self.applyButton = qt.QPushButton(parametersCollapsibleButton)
+    self.applyButton.text = "Apply"
+    parametersFormLayout.addWidget(self.applyButton)
 
-    # connections
-    self.applyButton.connect('clicked(bool)', self.onApplyButton)
-    self.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    self.outputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    self.applyButton.connect('clicked()', self.onApply)
 
     # Add vertical spacer
     self.layout.addStretch(1)
@@ -142,10 +133,10 @@ class FiberDistanceWidget:
   def onSelect(self):
     self.applyButton.enabled = self.inputSelector.currentNode() and self.outputSelector.currentNode()
 
-  def onApplyButton(self):
+  def onApply(self):
     logic = FiberDistanceLogic()
     print("Run the algorithm")
-    logic.run(self.inputSelector.currentNode(), self.outputSelector.currentNode())
+    logic.run(self.fiber1Selector.currentNode(), self.fiber2Selector.currentNode())
 
   def onReload(self,moduleName="FiberDistance"):
     """Generic reload method for any scripted module.
@@ -232,7 +223,7 @@ class FiberDistanceLogic:
       return False
     return True
 
-  def run(self,inputVolume,outputVolume):
+  def hausdorffDistance(self,fiber1,fiber2):
     """
     Run the actual algorithm
     """
@@ -285,25 +276,33 @@ class FiberDistanceTest(unittest.TestCase):
     """
 
     self.delayDisplay("Starting the test")
+
     #
-    # first, get some data
+    # first, get the data
+    # - amount of data depends on useCase attribue
     #
     import urllib
     downloads = (
-        ('http://slicer.kitware.com/midas3/download?items=5767', 'FA.nrrd', slicer.util.loadVolume),
+        ('http://slicer.kitware.com/midas3/download?items=5768', 'tract1.vtk', slicer.util.loadFiberBundle),
+        ('http://slicer.kitware.com/midas3/download?items=5769', 'tract2.vtk', slicer.util.loadFiberBundle),
         )
+    tracts = ('tract1', 'tract2',)
+    tractColors = ( (0.2, 0.9, 0.3), (0.9, 0.3, 0.3),)
 
+    # perform the downloads if needed, then load
     for url,name,loader in downloads:
       filePath = slicer.app.temporaryPath + '/' + name
       if not os.path.exists(filePath) or os.stat(filePath).st_size == 0:
-        print('Requesting download %s from %s...\n' % (name, url))
+        self.delayDisplay('Requesting download %s from %s...\n' % (name, url))
         urllib.urlretrieve(url, filePath)
       if loader:
-        print('Loading %s...\n' % (name,))
+        self.delayDisplay('Loading %s...\n' % (name,))
         loader(filePath)
     self.delayDisplay('Finished with download and loading\n')
 
-    volumeNode = slicer.util.getNode(pattern="FA")
+    tract1 = slicer.util.getNode('tract1')
+    tract2 = slicer.util.getNode('tract2')
+
     logic = FiberDistanceLogic()
-    self.assertTrue( logic.hasImageData(volumeNode) )
+    self.assertTrue( logic.hausdorffDistance(tract1, tract2) )
     self.delayDisplay('Test passed!')
