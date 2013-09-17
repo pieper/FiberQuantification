@@ -192,7 +192,7 @@ class FiberDistanceWidget:
     except Exception, e:
       import traceback
       traceback.print_exc()
-      qt.QMessageBox.warning(slicer.util.mainWindow(), 
+      qt.QMessageBox.warning(slicer.util.mainWindow(),
           "Reload and Test", 'Exception!\n\n' + str(e) + "\n\nSee Python Console for Stack Trace")
 
 
@@ -201,8 +201,8 @@ class FiberDistanceWidget:
 #
 
 class FiberDistanceLogic:
-  """This class should implement all the actual 
-  computation done by your module.  The interface 
+  """This class should implement all the actual
+  computation done by your module.  The interface
   should be such that other python code can import
   this class and make use of the functionality without
   requiring an instance of the Widget
@@ -253,7 +253,7 @@ class FiberDistanceLogic:
     avgd1 = 0.0
 
     distanceA = vtk.vtkFloatArray()
-    distanceA.SetName("Distance")   
+    distanceA.SetName("Distance")
     for i in range(rangeA):
         pt = ptsA.GetPoint(i)
         bid = locB.FindClosestPoint(pt)
@@ -262,13 +262,13 @@ class FiberDistanceLogic:
         distanceA.InsertNextValue(d)
         avgd += d
         if d > maxd:
-            maxd = d    
+            maxd = d
     avgd = avgd / rangeA
 #    print avgd
     print maxd
 
     distanceB = vtk.vtkFloatArray()
-    distanceB.SetName("Distance")   
+    distanceB.SetName("Distance")
     for i in range(rangeB):
         pt = ptsB.GetPoint(i)
         bid = locA.FindClosestPoint(pt)
@@ -368,13 +368,13 @@ class FiberDistanceTest(unittest.TestCase):
     logic = FiberDistanceLogic()
 
     dist = logic.hausdorffDistance(tract1, tract2)
-  
+
     file1 = tract1.GetStorageNode().GetFileName()
     file2 = tract2.GetStorageNode().GetFileName()
     fileDistance = logic.loadAndCalculate(file1, file2)
 
     self.assertTrue(dist == fileDistance)
-    
+
 
 
     self.delayDisplay('Test passed!')
