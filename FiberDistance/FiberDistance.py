@@ -85,7 +85,7 @@ class FiberDistanceWidget:
 
     # Collapsible button
     parametersCollapsibleButton = ctk.ctkCollapsibleButton()
-    parametersCollapsibleButton.text = "A collapsible button"
+    parametersCollapsibleButton.text = "Fiber Bundle to Fiber Bundle Distance"
     self.layout.addWidget(parametersCollapsibleButton)
 
     # Layout within the parameters collapsible button
@@ -121,6 +121,12 @@ class FiberDistanceWidget:
     self.applyButton = qt.QPushButton(parametersCollapsibleButton)
     self.applyButton.text = "Apply"
     parametersFormLayout.addWidget(self.applyButton)
+
+    # Collapsible button
+    batchCollapsibleButton = ctk.ctkCollapsibleButton()
+    batchCollapsibleButton.text = "Batch Processing"
+    self.layout.addWidget(batchCollapsibleButton)
+
 
     self.applyButton.connect('clicked()', self.onApply)
 
@@ -209,6 +215,44 @@ class FiberDistanceLogic:
   """
   def __init__(self):
     pass
+
+
+  def batchProcessDirectory(self,dir):
+    import fnmatch
+
+    # find all directories containing the target pattern
+    resultDirs = {}
+    patientNumbers = {}
+    for root, dirnames, filenames in os.walk(dir):
+      resultDirs[root] = []
+      for filename in filenames:
+        if fnmatch.fnmatch(filename, 'patient*tract_team*.vtk'):
+          resultDirs[root].append(os.path.join(root, filename))
+          patientNumbers[root] = filename[len('patient'):filename.index('_')]
+    print(patientNumbers)
+
+    distanceMatrix = {}
+    # calculate results for each pair of files in each directory
+    for dir,files in resultDirs.items():
+      if len(files) > 0:
+        teamCount = len(files) / 2 # left and right per team
+        for side in ('left','right'):
+          for teamA in range(8,8+teamCount):
+            for teamB in range(8,8+teamCount):
+              fmt = 'patient%(patient)s_%(side)s_tract_team%(team)d.vtk'
+              fileA = fmt % {'patient': patientNumbers[dir], 'side': side, 'team': teamA}
+              fileB = fmt % {'patient': patientNumbers[dir], 'side': side, 'team': teamB}
+              print ("Compare %s with %s" % (fileA, fileB))
+              print((os.path.join(dir,fileA),os.path.join(dir,fileB)))
+
+              # close the scene and calculate the distance
+              slicer.mrmlScene.Clear(0) 
+              distanceMatrix[dir,side,fileA,fileB] = self.loadAndCalculate(os.path.join(dir,fileA),os.path.join(dir,fileB))
+
+    return(distanceMatrix)
+
+
+
 
   def loadAndCalculate(self,tractFile1,tractFile2):
     """
@@ -338,6 +382,7 @@ class FiberDistanceTest(unittest.TestCase):
     """
 
     self.delayDisplay("Starting the test")
+    import os
 
     #
     # first, get the data
@@ -375,6 +420,10 @@ class FiberDistanceTest(unittest.TestCase):
 
     self.assertTrue(dist == fileDistance)
 
+    rootDir = '/Users/pieper/Dropbox/0_work/meetings/miccai2013/dti-challenge'
+    distances = logic.batchProcessDirectory(rootDir)
+
+    print(distances)
 
 
     self.delayDisplay('Test passed!')
