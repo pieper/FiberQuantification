@@ -141,7 +141,6 @@ class FiberDistanceWidget:
 
   def onApply(self):
     logic = FiberDistanceLogic()
-    print("Run the algorithm")
     logic.run(self.fiber1Selector.currentNode(), self.fiber2Selector.currentNode())
 
   def onReload(self,moduleName="FiberDistance"):
@@ -217,28 +216,36 @@ class FiberDistanceLogic:
     pass
 
 
-  def batchProcessDirectory(self,dir):
+  def batchProcessDirectory(self,baseDir):
+    """
+    - Finds all patient tract entries in baseDir
+    - calculates distance matrix
+    - saves results in csv file per patient
+    """
+
     import fnmatch
 
     # find all directories containing the target pattern
     resultDirs = {}
     patientNumbers = {}
-    for root, dirnames, filenames in os.walk(dir):
+    for root, dirnames, filenames in os.walk(baseDir):
       resultDirs[root] = []
       for filename in filenames:
         if fnmatch.fnmatch(filename, 'patient*tract_team*.vtk'):
           resultDirs[root].append(os.path.join(root, filename))
           patientNumbers[root] = filename[len('patient'):filename.index('_')]
-    print(patientNumbers)
 
     distanceMatrix = {}
     # calculate results for each pair of files in each directory
     for dir,files in resultDirs.items():
       if len(files) > 0:
         teamCount = len(files) / 2 # left and right per team
+        # TODO: auto detect team range
+        startTeam = 8
+        teamRange = range(startTeam,startTeam+teamCount)
         for side in ('left','right'):
-          for teamA in range(8,8+teamCount):
-            for teamB in range(8,8+teamCount):
+          for teamA in teamRange:
+            for teamB in teamRange:
               fmt = 'patient%(patient)s_%(side)s_tract_team%(team)d.vtk'
               fileA = fmt % {'patient': patientNumbers[dir], 'side': side, 'team': teamA}
               fileB = fmt % {'patient': patientNumbers[dir], 'side': side, 'team': teamB}
@@ -247,7 +254,30 @@ class FiberDistanceLogic:
 
               # close the scene and calculate the distance
               slicer.mrmlScene.Clear(0) 
-              distanceMatrix[dir,side,fileA,fileB] = self.loadAndCalculate(os.path.join(dir,fileA),os.path.join(dir,fileB))
+              pathA, pathB = os.path.join(dir,fileA),os.path.join(dir,fileB)
+              distanceMatrix[dir,side,teamA,teamB] = self.loadAndCalculate(pathA,pathB)
+    print('\n\n' + str(distanceMatrix.keys()) + '\n\n')
+    print(distanceMatrix)
+
+    # write csv files
+    import csv
+    header = ['team',]
+    for team in teamRange:
+      header.append('team_%d' % team)
+    for dir in resultDirs.keys():
+      print ('checking %s' % dir)
+      print (len(resultDirs[dir]))
+      if len(resultDirs[dir]) > 0:
+        for side in ('left','right'):
+          fp = open(os.path.join(dir,"../distanceMatrix-%s.csv"%side),'w')
+          csvWriter = csv.writer(fp, dialect='excel', quotechar='"', quoting=csv.QUOTE_ALL)
+          csvWriter.writerow(header)
+          for teamA in teamRange:
+            teamARow = ['team_%d' % teamA,]
+            for teamB in teamRange:
+              teamARow.append(distanceMatrix[dir,side,teamA,teamB])
+            csvWriter.writerow(teamARow)
+          fp.close()
 
     return(distanceMatrix)
 
@@ -308,8 +338,6 @@ class FiberDistanceLogic:
         if d > maxd:
             maxd = d
     avgd = avgd / rangeA
-#    print avgd
-    print maxd
 
     distanceB = vtk.vtkFloatArray()
     distanceB.SetName("Distance")
@@ -323,17 +351,10 @@ class FiberDistanceLogic:
         if d > maxd1:
             maxd1 = d
     avgd1 = avgd1 / rangeB
-#    print avgd1
-    print maxd1
-    if avgd1 > avgd:
-        print avgd1
-    else:
-        print avgd
 
     polyA.GetPointData().SetScalars(distanceA)
     polyB.GetPointData().SetScalars(distanceB)
 
-    print ('Max distance is %g', maxd)
     return maxd
 
 class FiberDistanceTest(unittest.TestCase):
