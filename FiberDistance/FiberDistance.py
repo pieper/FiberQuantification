@@ -353,7 +353,7 @@ class FiberDistanceLogic:
     polyA.GetPointData().SetScalars(distanceA)
     polyB.GetPointData().SetScalars(distanceB)
 
-    return maxd
+    return max(maxd,maxd1)
 
 class FiberDistanceTest(unittest.TestCase):
   """
