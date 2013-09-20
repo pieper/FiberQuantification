@@ -216,7 +216,7 @@ class FiberDistanceLogic:
     pass
 
 
-  def batchProcessDirectory(self,baseDir):
+  def batchProcessDirectory(self,baseDir,startTeam=1):
     """
     - Finds all patient tract entries in baseDir
     - calculates distance matrix
@@ -240,8 +240,6 @@ class FiberDistanceLogic:
     for dir,files in resultDirs.items():
       if len(files) > 0:
         teamCount = len(files) / 2 # left and right per team
-        # TODO: auto detect team range
-        startTeam = 8
         teamRange = range(startTeam,startTeam+teamCount)
         for side in ('left','right'):
           for teamA in teamRange:
@@ -442,7 +440,7 @@ class FiberDistanceTest(unittest.TestCase):
     self.assertTrue(dist == fileDistance)
 
     rootDir = '/Users/pieper/Dropbox/0_work/meetings/miccai2013/dti-challenge'
-    distances = logic.batchProcessDirectory(rootDir)
+    distances = logic.batchProcessDirectory(rootDir,startTeam=8)
 
     print(distances)
 
